@@ -93,17 +93,39 @@ def normalize(name: str) -> str:
     return name.replace("-", "_").strip()
 
 
+# def format_table(name: str, df: pd.DataFrame) -> str:
+#     """
+#     Build a proper Graphviz table label using record shapes with a header row.
+#     """
+#     label = f"{{{{ {name} }}|"  # header row
+
+#     field_rows = []
+#     for field in df["Field"]:
+#         field_rows.append(f"{field}\\l")  # left-aligned, line break
+
+#     label += "".join(field_rows) + "}"
+#     return label
+
+
 def format_table(name: str, df: pd.DataFrame) -> str:
     """
-    Build a proper Graphviz table label using record shapes with a header row.
+    Build a proper Graphviz table label using record shapes
+    with field, type, description columns.
     """
-    label = f"{{{{ {name} }}|"  # header row
+    header = "{ <title> " + name + " | Field | Type | Description }"
 
-    field_rows = []
-    for field in df["Field"]:
-        field_rows.append(f"{field}\\l")  # left-aligned, line break
+    rows = []
+    for i, row in df.iterrows():
+        r = (
+            "{ "
+            f"<f{i}> {row['Field']} | "
+            f"{row['Type']} | "
+            f"{row['Description']}"
+            " }"
+        )
+        rows.append(r)
 
-    label += "".join(field_rows) + "}"
+    label = "{ " + header + " | " + " | ".join(rows) + " }"
     return label
 
 
@@ -133,16 +155,15 @@ erd = ERD()
 
 dot = Digraph("schema", graph_attr={"rankdir": "LR"})
 
-# Draw tables
 for name, df in dfs.items():
-    table_label = format_table(name, df)
-    dot.node(name, label=table_label, shape="record")
+    dot.node(name, label=format_table(name, df), shape="record")
 
-# Draw relationships
+# Draw edges from specific field cells
 for parent, df in dfs.items():
-    for _, row in df.iterrows():
+    for i, row in df.iterrows():
         target = row["RefTable"]
         if target and target in dfs:
-            dot.edge(parent, target)
+            dot.edge(f"{parent}:f{i}", f"{target}:title")
 
+# Render ERD
 dot.render("schema_erd", format="png", cleanup=True)
