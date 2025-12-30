@@ -10,13 +10,11 @@ def read_json(json_file: str):
     with open(json_file) as jf:
         schema = json.load(jf)
 
-    # title = get_title(schema)
+    title = get_title(schema)
 
     required_fields = get_required_fields(schema)
 
     properties = get_properties(schema)
-
-    title = ""
 
     schema_dict = extract_prop_details(properties, required_fields, title)
     return schema_dict
@@ -46,7 +44,7 @@ def extract_prop_details(properties: dict, required_fields: list, title):
                 and details.get("items").get("type") == "object"
             ):
                 array_prop = details.get("items").get("properties")
-                required_array = details.get("items").get("required")
+                required_array = details.get("items").get("required", [])
                 recursive(array_prop, required_array, prop)
             if details.get("type", "") == "object":
                 required_object = details.get("required", [])
@@ -76,7 +74,7 @@ def get_properties(schema: dict):
 
 
 def get_title_from_id(schema: dict):
-    _id = schema.get("$id")
+    _id = schema.get("$id", "Root Table")
     return _id.split("/")[-1] if _id else None
 
 
@@ -93,40 +91,44 @@ def normalize(name: str) -> str:
     return name.replace("-", "_").strip()
 
 
-# def format_table(name: str, df: pd.DataFrame) -> str:
-#     """
-#     Build a proper Graphviz table label using record shapes with a header row.
-#     """
-#     label = f"{{{{ {name} }}|"  # header row
-
-#     field_rows = []
-#     for field in df["Field"]:
-#         field_rows.append(f"{field}\\l")  # left-aligned, line break
-
-#     label += "".join(field_rows) + "}"
-#     return label
-
-
 def format_table(name: str, df: pd.DataFrame) -> str:
     """
-    Build a proper Graphviz table label using record shapes
-    with field, type, description columns.
+    Build a Graphviz HTML-like table label with proper column alignment.
     """
-    header = "{ <title> " + name + " | Field | Type | Description }"
-
     rows = []
-    for i, row in df.iterrows():
-        r = (
-            "{ "
-            f"<f{i}> {row['Field']} | "
-            f"{row['Type']} | "
-            f"{row['Description']}"
-            " }"
-        )
-        rows.append(r)
 
-    label = "{ " + header + " | " + " | ".join(rows) + " }"
-    return label
+    # Header row
+    rows.append("<TR>" f"<TD COLSPAN='3'><B>{name}</B></TD>" "</TR>")
+
+    rows.append(
+        "<TR>"
+        "<TD><B>Field</B></TD>"
+        "<TD><B>Type</B></TD>"
+        "<TD><B>Description</B></TD>"
+        "</TR>"
+    )
+
+    # Data rows
+    for _, row in df.iterrows():
+        field = row["Field"]
+        dtype = row["Type"]
+        desc = row["Description"] or ""
+
+        rows.append(
+            "<TR>"
+            f"<TD ALIGN='LEFT'>{field}</TD>"
+            f"<TD ALIGN='LEFT'>{dtype}</TD>"
+            f"<TD ALIGN='LEFT'>{desc}</TD>"
+            "</TR>"
+        )
+
+    table = (
+        "<<TABLE BORDER='1' CELLBORDER='1' CELLSPACING='0' CELLPADDING='6'>"
+        + "".join(rows)
+        + "</TABLE>>"
+    )
+
+    return table
 
 
 tables = {normalize(list(d.keys())[0]): list(d.values())[0] for d in data}
@@ -153,17 +155,26 @@ dfs = {name: add_relationship_metadata(df) for name, df in dfs.items()}
 erd = ERD()
 
 
-dot = Digraph("schema", graph_attr={"rankdir": "LR"})
+dot = Digraph(
+    "schema",
+    graph_attr={
+        "rankdir": "TB",
+        "ranksep": "2.0",  # Increase vertical spacing
+        "nodesep": "0.5",  # Decrease horizontal spacing
+    },
+)
 
 for name, df in dfs.items():
-    dot.node(name, label=format_table(name, df), shape="record")
+    dot.node(name, label=format_table(name, df), shape="plaintext")
 
 # Draw edges from specific field cells
 for parent, df in dfs.items():
     for i, row in df.iterrows():
         target = row["RefTable"]
         if target and target in dfs:
-            dot.edge(f"{parent}:f{i}", f"{target}:title")
+            dot.edge(parent, target)
 
 # Render ERD
+dot.render("schema_erd", format="png", cleanup=True)
+dot.render("schema_erd", format="png", cleanup=True)
 dot.render("schema_erd", format="png", cleanup=True)
