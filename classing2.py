@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+from graphviz import Digraph
+
 
 @dataclass
 class SchemaProperty:
@@ -40,18 +43,27 @@ class SchemaRelationship:
     description: Optional[str] = None
 
 
+@dataclass
+class SchemaModel:
+    table: Dict[str, SchemaTable]
+    relationships: List[SchemaRelationship]
+
+
 class SchemaModeller:
     def __init__(self, schema: Dict[str, Any], enable_ref: bool = False):
-        self.schema = schema
-        self.tables: Dict[str, SchemaTable] = {}
-        self.relationships: List[SchemaRelationship] = []
-        self.enable_ref = enable_ref
+        self._schema = schema
+        self._tables: Dict[str, SchemaTable] = {}
+        self._relationships: List[SchemaRelationship] = []
+        self._enable_ref = enable_ref
 
-    def __call__(self) -> tuple[Dict[str, SchemaTable], List[SchemaRelationship]]:
-        """Main conversion method"""
+    def build(self) -> SchemaModel:
         root_title = self.schema.get("title", "Root")
         self._process_schema(root_title, self.schema, parent_table=None, is_root=True)
-        return self.tables, self.relationships
+        return SchemaModel(table=self.tables, relationships=self.relationships)
+
+    @property
+    def relationships(self) -> List[SchemaRelationship]:
+        return self._relationships
 
     def _process_schema(
         self,
@@ -59,44 +71,45 @@ class SchemaModeller:
         schema: Dict[str, Any],
         parent_table: Optional[str],
         is_root: bool = False,
-    ):
+    ) -> None:
         if table_name in self.tables and not is_root:
             return
 
-        schema_properties = schema.get("properties", {})
+        schema_properties = schema.get("properties", {}) or {}
         required_fields = set(schema.get("required", []))
-        is_required = False
-        properties_list = []
+        properties_list: List[SchemaProperty] = []
 
-        for prop_name, prop_schema in schema_properties.items():
-            prop_type = prop_schema.get("type", "any")
-            prop_name = prop_name.replace("-", "_").strip()
+        for prop_name, raw_prop_schema in schema_properties.items():
+            prop_name = normalize_name(prop_name)
+            prop_schema = raw_prop_schema
 
-            if "$ref" in prop_schema:
-                prop_schema = self._resolve_ref(prop_schema["$ref"])
-
-            if prop_name in required_fields:
-                is_required = True
+            # if "$ref" in prop_schema:
+            #     prop_schema = self._resolve_ref(prop_schema["$ref"])
+            prop_type = raw_prop_schema.get("type", "")
+            required = prop_name in required_fields
 
             prop = SchemaProperty(
                 name=prop_name,
-                type=prop_schema.get("type"),
-                description=prop_schema.get("description"),
-                required=is_required,
-                unit=prop_schema.get("unit"),
+                type=prop_type,
+                description=prop_schema.get("description", ""),
+                required=required,
+                unit=prop_schema.get("unit", ""),
                 format=prop_schema.get("format", ""),
                 parent_table=parent_table,
-                enum_values=prop_schema.get("enum"),
+                enum_values=prop_schema.get("enum", ""),
+                is_array=(prop_type == "array"),
+                is_object=(prop_type == "object"),
             )
 
             properties_list.append(prop)
 
+            # Nested array of objects → new table + 1:N relationship
             if prop_type == "array":
-                items = prop_schema.get("items")
+                items = raw_prop_schema.get("items") or {}
 
                 if items.get("type") == "object":
                     nested_table_name = items.get(
-                        "title", f"{table_name}_{prop_name}_item"
+                        "title", f"{table_name}_{prop_name}_items"
                     )
                     self._process_schema(
                         nested_table_name, items, parent_table=table_name
@@ -111,6 +124,7 @@ class SchemaModeller:
                         )
                     )
 
+            # Nested object → new table + 1:1 or 1:N (you chose 1:N)
             if prop_type == "object":
                 nested_table_name = prop_schema.get(
                     "title", f"{table_name}_{prop_name}"
@@ -126,7 +140,7 @@ class SchemaModeller:
                         relationship_type="1:N",
                     )
                 )
-        self.tables[table_name] = SchemaTable(
+        self._tables[table_name] = SchemaTable(
             table_name=table_name,
             description=schema.get("description"),
             title=schema.get("title"),
@@ -134,19 +148,29 @@ class SchemaModeller:
             properties=properties_list,
         )
 
-    def _resolve_ref(self, ref: str):
-        if not self.enable_ref:
-            ref
-        raise NotImplementedError("Ref resolve not ready")
+    def _resolve_ref(self, ref: str) -> Dict[str, Any]:
+        if not self._enable_ref:
+            raise NotImplementedError("Ref resolution disabled (enable_ref=False)")
 
-    def to_dataframes(self) -> Dict[str, pd.DataFrame]:
+        # TODO: implement according to your schema strategy:
+        #  - local references in self._schema
+        #  - external file references
+        raise NotImplementedError(f"Ref resolution not implemented for {ref}")
+
+
+class TabularAdapter:
+    def __init__(self, model: SchemaModel):
+        self._model = model
+
+    @property
+    def table_df(self) -> Dict[str, pd.DataFrame]:
         """Convert tables to DataFrames"""
-        dataframes = {}
+        frames: Dict[str, pd.DataFrame] = {}
 
         for table_name, table in self.tables.items():
-            data = []
+            rows = []
             for prop in table.properties:
-                data.append(
+                rows.append(
                     {
                         "Field": f"* {prop.name}" if prop.required else prop.name,
                         "Type": prop.type,
@@ -158,15 +182,15 @@ class SchemaModeller:
                     }
                 )
 
-            dataframes[table_name] = pd.DataFrame(data)
+            frames[table_name] = pd.DataFrame(rows)
+        return frames
 
-        return dataframes
-
-    def get_relationships_df(self) -> pd.DataFrame:
+    @property
+    def relationships_df(self) -> pd.DataFrame:
         """Get relationships as DataFrame"""
-        data = []
+        rows = []
         for rel in self.relationships:
-            data.append(
+            rows.append(
                 {
                     "From Table": rel.from_table,
                     "Relationship": rel.relationship_type,
@@ -175,222 +199,25 @@ class SchemaModeller:
                     "Description": rel.description or "-",
                 }
             )
+        return pd.DataFrame(rows)
 
 
-class SchemaToERD:
-    def __init__(self, schema_model: SchemaModeller, schema_viz: Any):
-        self._schema_df = schema_model.to_dataframes()
-        self._schema_reltionship = schema_model.get_relationships_df()
-        self.schema_viz = schema_viz
-
-    def format_table(self, name: str, data: pd.DataFrame) -> str:
-        """
-        Build a Graphviz HTML-like table label with proper column alignment.
-        """
-        rows = []
-
-        # Header row
-        rows.append("<TR>" f"<TD COLSPAN='3'><B>{name}</B></TD>" "</TR>")
-
-        rows.append(
-            "<TR>"
-            "<TD><B>Fields</B></TD>"
-            "<TD><B>Type</B></TD>"
-            "<TD><B>Description</B></TD>"
-            "</TR>"
-        )
-
-        # Data rows
-        for _, row in df.iterrows():
-            field = row["Field"]
-            dtype = row["Type"]
-            desc = row["Description"] or ""
-
-            rows.append(
-                "<TR>"
-                f"<TD ALIGN='LEFT'>{field}</TD>"
-                f"<TD ALIGN='LEFT'>{dtype}</TD>"
-                f"<TD ALIGN='LEFT'>{desc}</TD>"
-                "</TR>"
-            )
-
-        table = (
-            "<<TABLE BORDER='1' CELLBORDER='1' CELLSPACING='0' CELLPADDING='6'>"
-            + "".join(rows)
-            + "</TABLE>>"
-        )
-
-        return table
-
-
-def extract_prop_details(properties: dict, required_fields: list, title):
-    all_tables = []
-
-    def recursive(properties, required_fields, title):
-        table_list = defaultdict(list)
-        for prop, details in properties.items():
-            table = {}
-            if prop in required_fields:
-                field_name = prop + " *"
-            else:
-                field_name = prop
-            field_type = details.get("type", "")
-            field_desription = details.get("description", "")
-
-            table["Field"] = field_name
-            table["Type"] = field_type
-            table["Description"] = field_desription
-            table_list[title].append(table)
-
-            if (
-                details.get("type", "") == "array"
-                and details.get("items").get("type") == "object"
-            ):
-                array_prop = details.get("items").get("properties")
-                required_array = details.get("items").get("required", [])
-                recursive(array_prop, required_array, prop)
-            if details.get("type", "") == "object":
-                required_object = details.get("required", [])
-                object_prop = details.get("properties")
-                recursive(object_prop, required_object, prop)
-
-        all_tables.append(dict(table_list))
-
-    recursive(properties, required_fields, title)
-    return all_tables
-
-
-def get_array_vals(prop: dict):
-    if prop.get("type", "") == "array" and prop.get("items").get("type") == "object":
-        items = prop.get("items")
-        array_prop = get_properties(items)
-        required_array = get_required_fields(items)
-        return array_prop, required_array
-
-
-def get_required_fields(schema: dict):
-    return schema.get("required", [])
-
-
-def get_properties(schema: dict):
-    return schema.get("properties", {})
-
-
-def get_title_from_id(schema: dict):
-    _id = schema.get("$id", "Root Table")
-    return _id.split("/")[-1] if _id else None
-
-
-def get_title(schema: dict):
-    return schema.get("title", get_title_from_id(schema))
-
-
-data = read_json(
-    "/Users/ds2718/ukaea/ukaea-metadata/ukaea-schema/equipment/pyrometer.schema.json"
-)
-
-
-def normalize(name: str) -> str:
+def normalize_name(name: str) -> str:
     return name.replace("-", "_").strip()
 
 
-def format_table(name: str, df: pd.DataFrame) -> str:
-    """
-    Build a Graphviz HTML-like table label with proper column alignment.
-    """
-    rows = []
-
-    # Header row
-    rows.append("<TR>" f"<TD COLSPAN='3'><B>{name}</B></TD>" "</TR>")
-
-    rows.append(
-        "<TR>"
-        "<TD><B>Fields</B></TD>"
-        "<TD><B>Type</B></TD>"
-        "<TD><B>Description</B></TD>"
-        "</TR>"
-    )
-
-    # Data rows
-    for _, row in df.iterrows():
-        field = row["Field"]
-        dtype = row["Type"]
-        desc = row["Description"] or ""
-
-        rows.append(
-            "<TR>"
-            f"<TD ALIGN='LEFT'>{field}</TD>"
-            f"<TD ALIGN='LEFT'>{dtype}</TD>"
-            f"<TD ALIGN='LEFT'>{desc}</TD>"
-            "</TR>"
-        )
-
-    table = (
-        "<<TABLE BORDER='1' CELLBORDER='1' CELLSPACING='0' CELLPADDING='6'>"
-        + "".join(rows)
-        + "</TABLE>>"
-    )
-
-    return table
-
-
-tables = {normalize(list(d.keys())[0]): list(d.values())[0] for d in data}
-
-
-dfs = {name: pd.DataFrame(value) for name, value in tables.items()}
-
-
-def add_relationship_metadata(data_df: pd.DataFrame) -> pd.DataFrame:
-    data_df = data_df.copy()
-
-    data_df["RefTable"] = data_df.apply(
-        lambda row: normalize(row["Field"].replace("*", "").strip())
-        if row["Type"] == "object"
-        else None,
-        axis=1,
-    )
-    return data_df
-
-
-dfs = {name: add_relationship_metadata(df) for name, df in dfs.items()}
-
-
-erd = ERD()
-
-
-dot = Digraph(
-    "schema",
-    graph_attr={
-        "rankdir": "TB",
-        "ranksep": "2.0",  # Increase vertical spacing
-        "nodesep": "0.5",  # Decrease horizontal spacing
-    },
-)
-
-for name, df in dfs.items():
-    dot.node(name, label=format_table(name, df), shape="plaintext")
-
-# Draw edges from specific field cells
-for parent, df in dfs.items():
-    for i, row in df.iterrows():
-        target = row["RefTable"]
-        if target and target in dfs:
-            dot.edge(parent, target)
-
-# Render ERD
-dot.render("schema_erd", format="png", cleanup=True)
-
-
 class SchemaViz:
-    def __init__(self, table_name: str, dfs: Dict[str, pd.DataFrame]):
-        self.table_name = table_name
-        self.data = dfs
+    def __init__(
+        self, tables: Dict[str, pd.DataFrame], relationships: List[SchemaRelationship]
+    ):
+        self._relationship = relationships
+        self._tables = tables
 
-    def _format_table(name: str, df: pd.DataFrame) -> str:
+    def _format_table(self, name: str, df: pd.DataFrame) -> str:
         """
         Build a Graphviz HTML-like table label with proper column alignment.
         """
-        rows = []
+        rows: List[str] = []
 
         # Header row
         rows.append("<TR>" f"<TD COLSPAN='3'><B>{name}</B></TD>" "</TR>")
@@ -425,9 +252,7 @@ class SchemaViz:
 
         return table
 
-    def render_table(self, relationships: list[SchemaRelationship]):
-        erd = ERD()
-
+    def render_table(self, filename: str = "schema_erd", fmt: str = "png") -> None:
         dot = Digraph(
             "schema",
             graph_attr={
@@ -437,13 +262,50 @@ class SchemaViz:
             },
         )
 
-        for name, df in self.data.items():
+        for name, df in self._tables.items():
             dot.node(name, label=self._format_table(name, df), shape="plaintext")
 
-            for rel in relationships:
-                if name == rel.from_table:
-                    parent = name
-                    target = rel.to_table
-                    relationship = rel.relationship_type
-                    dot.edge(parent, target)
-        dot.render("schema_name", format="png", cleanup=True)
+            for rel in self._relationship:
+                dot.edge(rel.from_table, rel.to_table, label=rel.relationship_type)
+                # if name == rel.from_table:
+                #     parent = name
+                #     target = rel.to_table
+                #     relationship = rel.relationship_type
+                #     dot.edge(parent, target)
+            dot.render(filename, format=fmt, cleanup=True)
+
+
+def build_erd_from_schema(schema: Dict[str, Any], output: str = "schema_erd") -> None:
+    modeller = SchemaModeller(schema)
+    model = modeller.build()
+
+    adapter = TabularAdapter(model)
+
+    dfs = adapter.table_df
+
+    viz = SchemaViz(dfs, model.relationships)
+
+    viz.render(output)
+
+
+# class SchemaToERD:
+#     def __init__(self, schema_model: SchemaModeller):
+#         self._schema_df = schema_model.to_dataframes()
+#         self._schema_relationships = schema_model.relationships
+#         # pick some root or pass it in; for now just use first table
+#         table_name = next(iter(self._schema_df)) if self._schema_df else "schema"
+#         self.schema_viz = SchemaViz(table_name, self._schema_df)
+
+#     def render(self, output_name: str = "schema_erd") -> None:
+#         self.schema_viz.render_table(self._schema_relationships)
+
+# OR
+# class SchemaToERD:
+#     def __init__(self, schema_model: SchemaModeller, schema_viz: SchemaViz):
+#         self._schema_df = schema_model.to_dataframes()
+#         self._schema_relationships = schema_model.relationships
+#         self.schema_viz = schema_viz
+
+#     def render(self, output_name: str = "schema_erd") -> None:
+#         # optionally let SchemaViz accept the filename
+#         self.schema_viz.render_table(self._schema_relationships)#         self.schema_viz.render_table(self._schema_relationships)#         self.schema_viz.render_table(self._schema_relationships)
