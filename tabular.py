@@ -1,20 +1,27 @@
-from typing import Dict
+from typing import Dict, List
 
 import pandas as pd
 
-from modelling import SchemaModel
+from modelling import SchemaModel, SchemaRelationship
 
 
 class TabularAdapter:
-    def __init__(self, model: SchemaModel):
+    def __init__(
+        self,
+        model: SchemaModel,
+        tables: Dict[str, pd.DataFrame],
+        relationships: List[SchemaRelationship],
+    ):
         self._model = model
+        self._tables = tables
+        self._relationships = relationships
 
     @property
     def table_df(self) -> Dict[str, pd.DataFrame]:
         """Convert tables to DataFrames"""
         frames: Dict[str, pd.DataFrame] = {}
 
-        for table_name, table in self.tables.items():
+        for table_name, table in self._tables.items():
             rows = []
             for prop in table.properties:
                 rows.append(
@@ -36,7 +43,7 @@ class TabularAdapter:
     def relationships_df(self) -> pd.DataFrame:
         """Get relationships as DataFrame"""
         rows = []
-        for rel in self.relationships:
+        for rel in self._relationships:
             rows.append(
                 {
                     "From Table": rel.from_table,
