@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict
 
 from modelling import SchemaModeller
@@ -16,3 +17,8 @@ def build_erd_from_schema(schema: Dict[str, Any], output: str = "schema_erd") ->
     viz = SchemaViz(dfs, model.relationships)
 
     viz.render_table(output)
+
+
+def load_json(json_file):
+    with open(json_file) as jf:
+        return json.load(jf)
