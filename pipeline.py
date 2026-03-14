@@ -6,7 +6,7 @@ from tabular import TabularAdapter
 from vizualizer import SchemaViz
 
 
-def build_erd_from_schema(schema: Dict[str, Any], output: str = "schema_erd") -> None:
+def build_erd_from_schema(schema: Dict[str, Any], output: str, fmt: str) -> None:
     modeller = SchemaModeller(schema)
     model = modeller.build()
 
@@ -16,9 +16,10 @@ def build_erd_from_schema(schema: Dict[str, Any], output: str = "schema_erd") ->
 
     viz = SchemaViz(dfs, model.relationships)
 
-    viz.render_table(output)
+    viz.render_table(outfile=output, fmt=fmt)
 
 
-def load_json(json_file):
+def load_json(json_file) -> Dict:
     with open(json_file) as jf:
-        return json.load(jf)
+        schema = json.load(jf)
+    return schema

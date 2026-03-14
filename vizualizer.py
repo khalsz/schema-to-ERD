@@ -52,7 +52,7 @@ class SchemaViz:
 
         return table
 
-    def render_table(self, outfile: str = "scheman", fmt: str = "png") -> None:
+    def render_table(self, outfile: str, fmt: str) -> None:
         dot = Digraph(
             "schema",
             graph_attr={
