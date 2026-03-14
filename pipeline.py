@@ -2,7 +2,7 @@ import json
 from typing import Any, Dict
 
 from modelling import SchemaModeller
-from tabular import TabularAdapter
+from tabularize import TabularAdapter
 from vizualizer import SchemaViz
 
 
