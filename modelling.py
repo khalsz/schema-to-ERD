@@ -42,21 +42,21 @@ class SchemaRelationship:
 
 @dataclass
 class SchemaModel:
-    tables: List[SchemaTable]
+    table: Dict[str, SchemaTable]
     relationships: List[SchemaRelationship]
 
 
 class SchemaModeller:
     def __init__(self, schema: Dict[str, Any], enable_ref: bool = False):
         self._schema = schema
-        self._tables: List[SchemaTable] = []
+        self._tables: Dict[str, SchemaTable] = {}
         self._relationships: List[SchemaRelationship] = []
         self._enable_ref = enable_ref
 
     def build(self) -> SchemaModel:
         root_title = self._schema.get("title", "Root")
         self._process_schema(root_title, self._schema, parent_table=None, is_root=True)
-        return SchemaModel(tables=self._tables, relationships=self._relationships)
+        return SchemaModel(table=self._tables, relationships=self._relationships)
 
     @property
     def relationships(self) -> List[SchemaRelationship]:
@@ -82,14 +82,12 @@ class SchemaModeller:
             required_fields=required_fields,
             parent_table=parent_table,
         )
-        self._tables.append(
-            SchemaTable(
-                table_name=table_name,
-                description=schema.get("description"),
-                title=schema.get("title"),
-                is_root=is_root,
-                properties=properties_list,
-            )
+        self._tables[table_name] = SchemaTable(
+            table_name=table_name,
+            description=schema.get("description"),
+            title=schema.get("title"),
+            is_root=is_root,
+            properties=properties_list,
         )
 
     def _build_properties(
@@ -127,6 +125,7 @@ class SchemaModeller:
 
             if prop_type == "array":
                 self._handle_array_property(table_name, prop_name, prop_schema)
+
             if prop_type == "object":
                 self._handle_object_property(table_name, prop_name, prop_schema)
 

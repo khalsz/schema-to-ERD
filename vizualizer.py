@@ -52,7 +52,7 @@ class SchemaViz:
 
         return table
 
-    def render_table(self, filename: str = "schema_erd", fmt: str = "png") -> None:
+    def render_table(self, outfile: str, fmt: str) -> None:
         dot = Digraph(
             "schema",
             graph_attr={
@@ -65,11 +65,11 @@ class SchemaViz:
         for name, df in self._tables.items():
             dot.node(name, label=self._format_table(name, df), shape="plaintext")
 
-            for rel in self._relationship:
-                dot.edge(rel.from_table, rel.to_table, label=rel.relationship_type)
-                # if name == rel.from_table:
-                #     parent = name
-                #     target = rel.to_table
-                #     relationship = rel.relationship_type
-                #     dot.edge(parent, target)
-            dot.render(filename, format=fmt, cleanup=True)
+        for rel in self._relationship:
+            dot.edge(rel.from_table, rel.to_table, label=rel.relationship_type)
+            # if name == rel.from_table:
+            #     parent = name
+            #     target = rel.to_table
+            #     relationship = rel.relationship_type
+            #     dot.edge(parent, target)
+        dot.render(filename=outfile, format=fmt, cleanup=True)
