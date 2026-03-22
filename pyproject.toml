@@ -1,7 +1,12 @@
 [project]
 name = "schema-to-erd"
 version = "0.1.0"
-description = "Add your description here"
+description = "Converts JSON schema into simple ERD diagram"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "graphviz>=0.21",
+    "pandas>=3.0.1",
+]
+[project.scripts]
+schema-to-erd = "schema_to_erd.cli:main"

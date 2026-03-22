@@ -2,7 +2,7 @@ from typing import Dict
 
 import pandas as pd
 
-from modelling import SchemaModel
+from .modelling import SchemaModel
 
 
 class TabularAdapter:
