@@ -1,18 +1,17 @@
 # schema-to-erd
 
-Convert JSON schema into **simple, human-friendly ERD diagrams**.
+Convert **JSON Schema (Draft 2020-12)** into simple, human-friendly ERD diagrams.
 
-Most ERD tools are built for database engineers and produce overly complex diagrams.
-**schema-to-erd** is designed for **non-technical users**, making relationships easy to understand at a glance.
+This tool transforms structured JSON Schema definitions into clear entity-relationship diagrams — making them easier to understand for both technical and non-technical users.
 
 ---
 
 ## ✨ Features
 
-* 📊 Convert JSON schema → ERD diagram
-* 🧠 Simplified visual output (non-technical friendly)
-* ⚡ Lightweight and fast
-* 🎨 Supports multiple output formats (e.g. PNG, SVG)
+* 🔄 Convert JSON Schema → ERD diagram
+* 🧠 Simplified visual output (focused on clarity)
+* 📦 Supports standard JSON Schema format
+* 🎨 Export diagrams as PNG (via Graphviz)
 * 🧩 CLI + Python API support
 
 ---
@@ -23,7 +22,7 @@ Most ERD tools are built for database engineers and produce overly complex diagr
 pip install schema-to-erd
 ```
 
-> ⚠️ Requires Graphviz installed on your system:
+> ⚠️ Requires Graphviz installed:
 >
 > **Mac**
 >
@@ -45,67 +44,13 @@ pip install schema-to-erd
 schema-to-erd --input schema.json
 ```
 
-### With options
-
-```bash
-schema-to-erd --input schema.json --out-file my_diagram --format png
-```
-
----
-
-## 🧪 Example
-
-### Input (`schema.json`)
-
-```json
-{
-  "users": {
-    "id": "int",
-    "name": "string"
-  },
-  "orders": {
-    "id": "int",
-    "user_id": "int"
-  }
-}
-```
-
-### Command
-
-```bash
-schema-to-erd --input schema.json --format png
-```
-
-### Output
-
-```
-users ────────┐
-              │
-              ▼
-           orders
-```
-
-*(Actual output will be a rendered diagram image)*
-
----
-
-## 🐍 Python Usage
-
-You can also use it programmatically:
-
-```python
-from schema_to_erd import build_erd_from_schema
-
-build_erd_from_schema(
-    "schema.json",
-    "output",
-    "png"
-)
-```
-
 ---
 
 ## ⚙️ CLI Options
+
+```bash
+schema-to-erd --input schema.json --out-file product --format png
+```
 
 | Option       | Description                         |
 | ------------ | ----------------------------------- |
@@ -115,65 +60,95 @@ build_erd_from_schema(
 
 ---
 
-## 📁 Output
+## 🧪 Example
 
-If no output file is specified:
+### Input (`product.schema.json`)
 
-```bash
-schema-to-erd --input path/to/file.schema.json
-```
-
-👉 Output will be:
-
-```
-file.png
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Product",
+  "type": "object",
+  "properties": {
+    "productId": {
+      "type": "integer"
+    },
+    "productName": {
+      "type": "string"
+    }
+  }
+}
 ```
 
 ---
 
-## 🧠 Design Philosophy
+### Command
 
-This project was built to solve a real problem:
+```bash
+schema-to-erd --input product.schema.json --format png
+```
 
-> Non-technical users struggle to understand traditional ER diagrams.
+---
 
-So instead of:
+### Output
 
-* complex graph structures ❌
-* overwhelming technical details ❌
+The tool generates a diagram with:
 
-We focus on:
+* **Entity:** Product
+* **Attributes:**
 
-* clarity ✅
-* simplicity ✅
-* usability ✅
+  * productId (integer)
+  * productName (string)
+
+---
+
+## 🐍 Python Usage
+
+```python
+from schema_to_erd import build_erd_from_schema
+
+build_erd_from_schema(
+    "product.schema.json",
+    "product",
+    "png"
+)
+```
+
+---
+
+## 📁 Output Behaviour
+
+```bash
+schema-to-erd --input path/to/product.schema.json
+```
+
+👉 Output:
+
+```
+product.png
+```
+
+---
+
+## 🧠 How It Works
+
+* JSON Schema `title` → Entity name
+* `properties` → Attributes
+* Nested objects / references → Relationships
 
 ---
 
 ## 🛠️ Development
 
-Clone the repo:
-
 ```bash
 git clone https://github.com/khalsz/schema-to-ERD.git
 cd schema-to-ERD
-```
-
-Install locally:
-
-```bash
 pip install -e .
-```
-
-Run:
-
-```bash
-schema-to-erd --input example.json
 ```
 
 ---
 
-## 🧪 Running Tests (if added)
+## 🧪 Testing
 
 ```bash
 pytest
@@ -185,8 +160,6 @@ pytest
 
 MIT License
 
----
-
 ## 🤝 Contributing
 
 Contributions are welcome!
@@ -195,23 +168,6 @@ Contributions are welcome!
 * Suggest improvements
 * Submit pull requests
 
----
-
-## 🌟 Future Improvements
-
-* Schema diff visualization
-* Web-based preview
-* Support for SQL schemas
-* More layout customization
-
----
-
 ## 👤 Author
 
 Built by Khalsz
-
----
-
-## ⭐ Support
-
-If you find this useful, consider starring the repo!
