@@ -129,6 +129,16 @@ class SchemaModeller:
             if prop_type == "object":
                 self._handle_object_property(table_name, prop_name, prop_schema)
 
+            # if prop_name == "$def":
+            #     prop_name = prop_schema.key()
+            #     schema_prop = prop_schema.values()
+            #     schema_prop_type = schema_prop.get("type", "")
+            #     if schema_prop_type == "object":
+            #         self._handle_object_property(table_name, prop_name, schema_prop)
+
+            #     if schema_prop_type == "array":
+            #         self._handle_array_property(table_name, prop_name, schema_prop)
+
         return property_list
 
     # Nested array of objects → new table + 1:N relationship
@@ -138,7 +148,7 @@ class SchemaModeller:
         items = prop_schema.get("items") or {}
 
         if items.get("type") == "object":
-            nested_table_name = items.get("title", f"{table_name}_{prop_name}_items")
+            nested_table_name = items.get("title", f"property['{prop_name}']")
             self._process_schema(nested_table_name, items, parent_table=table_name)
             # if items.get("type") == "array":
             #     nested_table_name = items.get(
@@ -158,7 +168,7 @@ class SchemaModeller:
     def _handle_object_property(
         self, table_name: str, prop_name: str, prop_schema: Dict[str, Any]
     ) -> None:
-        nested_table_name = prop_schema.get("title", f"{prop_name}")
+        nested_table_name = prop_schema.get("title", f"property['{prop_name}']")
 
         self._process_schema(nested_table_name, prop_schema, parent_table=prop_name)
 

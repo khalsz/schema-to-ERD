@@ -1,9 +1,9 @@
 import json
 import logging
 
-from .modelling import SchemaModeller
-from .tabularize import TabularAdapter
-from .vizualizer import SchemaViz
+from .adapters.tabular_adapter import TabularAdapter
+from .modelling.schema_modeller import SchemaModeller
+from .visualizer.schema_viz import SchemaViz
 
 logger = logging.getLogger(__name__)
 

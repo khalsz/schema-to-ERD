@@ -3,7 +3,7 @@ from typing import Dict, List
 import pandas as pd
 from graphviz import Digraph
 
-from .modelling import SchemaRelationship
+from ..modelling.schema_modeller import SchemaRelationship
 
 
 class SchemaViz:
