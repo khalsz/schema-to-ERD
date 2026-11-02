@@ -1,68 +1,119 @@
 # schema-to-erd
 
-Convert **JSON Schema (Draft 2020-12)** into simple, human-friendly ERD diagrams.
+Convert **JSON Schema (Draft 2020-12)** into simple, human-friendly entity-relationship diagrams (ERDs).
 
-This tool transforms structured JSON Schema definitions into clear entity-relationship diagrams — making them easier to understand for both technical and non-technical users.
-
----
+`schema-to-erd` transforms JSON Schema definitions into clear diagrams that help technical and non-technical users understand data structures, entities, attributes, and relationships.
 
 ## ✨ Features
 
-* 🔄 Convert JSON Schema → ERD diagram
-* 🧠 Simplified visual output (focused on clarity)
-* 📦 Supports standard JSON Schema format
-* 🎨 Export diagrams as PNG (via Graphviz)
-* 🧩 CLI + Python API support
-
----
+- Convert JSON Schema into ERD diagrams.
+- Generate simplified, readable diagrams.
+- Support standard JSON Schema definitions.
+- Export diagrams in supported Graphviz formats, such as PNG.
+- Use the tool from the command line or as a Python API.
 
 ## 📦 Installation
+
+Install the package from PyPI:
 
 ```bash
 pip install schema-to-erd
 ```
 
-> ⚠️ Requires Graphviz installed:
->
-> **Mac**
->
-> ```bash
-> brew install graphviz
-> ```
->
-> **Ubuntu**
->
-> ```bash
-> sudo apt install graphviz
-> ```
+### System requirement: Graphviz
 
----
+The package requires Graphviz to be installed on your system.
 
-## 🚀 Quick Start (CLI)
+**macOS**
 
 ```bash
-schema-to-erd --input schema.json
+brew install graphviz
 ```
 
----
-
-## ⚙️ CLI Options
+**Ubuntu/Debian**
 
 ```bash
-schema-to-erd --input schema.json --out-file product --format png
+sudo apt update
+sudo apt install graphviz
 ```
 
-| Option       | Description                         |
-| ------------ | ----------------------------------- |
-| `--input`    | Path to JSON schema file (required) |
-| `--out-file` | Output file name                    |
-| `--format`   | Output format (default: png)        |
+For other operating systems, see the [Graphviz download page](https://graphviz.org/download/).
 
----
+## 🚀 Quick Start: Command Line
+
+Given a JSON Schema file named `product.json`, generate an ERD with:
+
+```bash
+schema-to-erd --input product.json
+```
+
+By default, the tool generates `product.png` in the current working directory.
+
+### CLI options
+
+You can customise the output filename and format:
+
+```bash
+schema-to-erd --input product.json --out-file product-erd --format png
+```
+
+| Option       | Required | Description                                                            |
+| ------------ | -------- | ---------------------------------------------------------------------- |
+| `--input`    | Yes      | Path to JSON schema file                                               |
+| `--out-file` | No       | Output file name without the extension. Defaults to the input filename |
+| `--format`   | No       | Output format (Default: png)                                           |
+
+For example, to generate an SVG diagram:
+
+```bash
+schema-to-erd --input product.json --out-file product-erd --format svg
+```
+
+The available formats depend on your Graphviz installation and the formats supported by the package.
+
+## 🐍 Python API
+
+You can also use `schema-to-erd` directly in your Python projects.
+
+### Basic usage
+
+```python
+from schema_to_erd import build_erd_from_schema
+
+build_erd_from_schema("product.json")
+```
+
+This uses the default settings and generates `product.png` in the current working directory.
+
+### Custom output filename and format
+
+Use keyword arguments to specify the output filename and format:
+
+```python
+from schema_to_erd import build_erd_from_schema
+
+build_erd_from_schema(
+    json_file="product.json",
+    output="product-erd",
+    fmt="svg",
+)
+```
+
+This generates `product-erd.svg`.
+
+### Function parameters
+
+| Option       | Required | Default                          | Description                         |
+| ------------ | -------- | -------------------------------- | ----------------------------------- |
+| `--input`    | Yes      | -                                | Path to JSON schema file            |
+| `--out-file` | No       | Input filename without extension | Output file without the extension.  |
+| `--format`   | No       | "png".                           | Output format (default: png)        |
+
+The function generates a diagram file rather than returning the diagram itself.
 
 ## 🧪 Example
 
-### Input (`product.schema.json`)
+### Input: `product.json`
 
 ```json
 {
@@ -80,94 +131,75 @@ schema-to-erd --input schema.json --out-file product --format png
 }
 ```
 
----
-
-### Command
+### Generate the diagram
 
 ```bash
-schema-to-erd --input product.schema.json --format png
+schema-to-erd --input product.json
 ```
 
----
+### Expected diagram contents
 
-### Output
+The generated ERD represents the `Product` entity with these attributes:
 
-The tool generates a diagram with:
-
-* **Entity:** Product
-* **Attributes:**
-
-  * productId (integer)
-  * productName (string)
-
----
-
-## 🐍 Python Usage
-
-```python
-from schema_to_erd import build_erd_from_schema
-
-build_erd_from_schema(
-    "product.schema.json",
-    "product",
-    "png"
-)
-```
-
----
-
-## 📁 Output Behaviour
-
-```bash
-schema-to-erd --input path/to/product.schema.json
-```
-
-👉 Output:
-
-```
-product.png
-```
-
----
+- `productId` — integer
+- `productName` — string
 
 ## 🧠 How It Works
 
-* JSON Schema `title` → Entity name
-* `properties` → Attributes
-* Nested objects / references → Relationships
+The tool interprets JSON Schema structures to construct an ERD:
 
----
+- **Schema `title`** — used as the entity name.
+- **`properties`** — represented as entity attributes.
+- **Nested objects and references** — used to identify relationships where supported by the implementation.
 
 ## 🛠️ Development
+
+To work on the source code:
 
 ```bash
 git clone https://github.com/khalsz/schema-to-ERD.git
 cd schema-to-ERD
-pip install -e .
 ```
 
----
+If you use `uv`:
+
+```bash
+uv sync --group dev
+```
+
+Alternatively, install the project in editable mode using pip:
+
+```bash
+pip install -e ".[dev]"
+```
+
+The pip command assumes your development dependencies are defined in the `dev` optional-dependency group.
 
 ## 🧪 Testing
+
+Run the test suite with:
+
+```bash
+uv run pytest
+```
+
+Or, if you have installed the development dependencies in your active environment:
 
 ```bash
 pytest
 ```
 
----
-
 ## 📄 License
 
-MIT License
+This project is licensed under the MIT License. See the repository's license file for details.
 
 ## 🤝 Contributing
 
 Contributions are welcome!
 
-* Open issues
-* Suggest improvements
-* Submit pull requests
+- Open an issue to report a bug or suggest an improvement.
+- Submit a pull request with your proposed changes.
 
 ## 👤 Author
 
-Built by Khalsz
+Built by Khalsz.
