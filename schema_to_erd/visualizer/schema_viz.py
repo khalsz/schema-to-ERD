@@ -35,6 +35,7 @@ class SchemaViz:
             "integer": ("#EDE9FE", "#6D28D9"),
             "number": ("#FFEDD5", "#C2410C"),
             "array": ("#CCFBF1", "#0F766E"),
+            "enum": ("#FCE7F3", "#BE185D"),
         }
 
         rows = [
@@ -54,7 +55,7 @@ class SchemaViz:
         # Data rows
         for _, row in df.iterrows():
             field = str(row["Field"])
-            data_type = str(row["Type"])
+            data_type = "" if pd.isna(row["Type"]) else str(row["Type"]).strip()
 
             # Identify required fields
             required = field.startswith("*")
@@ -87,11 +88,16 @@ class SchemaViz:
                 type_key, ("#F1F5F9", "#475569")
             )
 
+            if data_type.strip():
+                type_content = f"<B>{escape(data_type)}</B>"
+            else:
+                type_content = "&#160;"
+
             # Data type cell (no nested table)
             type_cell = (
                 f"<TD ALIGN='LEFT' BGCOLOR='{background}'>"
                 f"<FONT COLOR='{foreground}' POINT-SIZE='9'>"
-                f"<B>{escape(data_type)}</B>"
+                f"{type_content}"
                 "</FONT></TD>"
             )
 
