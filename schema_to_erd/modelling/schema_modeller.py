@@ -106,6 +106,9 @@ class SchemaModeller:
             #     resolved = self._resolve_ref(prop_schema["$ref"])
             # prop_schema.update(resolved)
             prop_type = prop_schema.get("type", "")
+            if not prop_type and "enum" in prop_schema:
+                prop_type = "enum"
+
             required = prop_name in required_fields
 
             prop = SchemaProperty(
