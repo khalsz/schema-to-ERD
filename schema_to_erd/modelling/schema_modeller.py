@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -8,11 +8,11 @@ class SchemaProperty:
 
     name: str
     type: str
-    description: Optional[str] = None
-    unit: Optional[str] = None
-    format: Optional[str] = None
-    parent_table: Optional[str] = None
-    enum_values: Optional[List[str]] = None
+    description: str | None = None
+    unit: str | None = None
+    format: str | None = None
+    parent_table: str | None = None
+    enum_values: list[str] | None = None
     is_array: bool = False
     is_object: bool = False
     required: bool = False
@@ -23,10 +23,10 @@ class SchemaTable:
     """Represents a table (object) in the ERD"""
 
     table_name: str
-    description: Optional[str]
-    title: Optional[str]
+    description: str | None
+    title: str | None
     is_root: bool = False
-    properties: List[SchemaProperty] = field(default_factory=list)
+    properties: list[SchemaProperty] = field(default_factory=list)
 
 
 @dataclass
@@ -36,21 +36,20 @@ class SchemaRelationship:
     from_table: str
     to_table: str
     foreign_key: str
-    relationship_type: str  # "1:1", "1:N", "N:M"
-    description: Optional[str] = None
+    description: str | None = None
 
 
 @dataclass
 class SchemaModel:
-    table: Dict[str, SchemaTable]
-    relationships: List[SchemaRelationship]
+    table: dict[str, SchemaTable]
+    relationships: list[SchemaRelationship]
 
 
 class SchemaModeller:
-    def __init__(self, schema: Dict[str, Any], enable_ref: bool = False):
+    def __init__(self, schema: dict[str, Any], enable_ref: bool = False):
         self._schema = schema
-        self._tables: Dict[str, SchemaTable] = {}
-        self._relationships: List[SchemaRelationship] = []
+        self._tables: dict[str, SchemaTable] = {}
+        self._relationships: list[SchemaRelationship] = []
         self._enable_ref = enable_ref
 
     def build(self) -> SchemaModel:
@@ -59,14 +58,14 @@ class SchemaModeller:
         return SchemaModel(table=self._tables, relationships=self._relationships)
 
     @property
-    def relationships(self) -> List[SchemaRelationship]:
+    def relationships(self) -> list[SchemaRelationship]:
         return self._relationships
 
     def _process_schema(
         self,
         table_name: str,
-        schema: Dict[str, Any],
-        parent_table: Optional[str],
+        schema: dict[str, Any],
+        parent_table: str | None,
         is_root: bool = False,
     ) -> None:
         if table_name in self._tables and not is_root:
@@ -74,7 +73,7 @@ class SchemaModeller:
 
         schema_properties = schema.get("properties", {}) or {}
         required_fields = set(schema.get("required", []))
-        properties_list: List[SchemaProperty] = []
+        properties_list: list[SchemaProperty] = []
 
         properties_list = self._build_properties(
             table_name=table_name,
@@ -93,11 +92,11 @@ class SchemaModeller:
     def _build_properties(
         self,
         table_name: str,
-        schema_properties: Dict[str, Any],
+        schema_properties: dict[str, Any],
         required_fields: set[str],
-        parent_table: Optional[str],
-    ) -> List[SchemaProperty]:
-        property_list: List[SchemaProperty] = []
+        parent_table: str | None,
+    ) -> list[SchemaProperty]:
+        property_list: list[SchemaProperty] = []
 
         for prop_name, raw_prop_schema in schema_properties.items():
             prop_name = normalize_name(prop_name)
@@ -107,6 +106,9 @@ class SchemaModeller:
             #     resolved = self._resolve_ref(prop_schema["$ref"])
             # prop_schema.update(resolved)
             prop_type = prop_schema.get("type", "")
+            if not prop_type and "enum" in prop_schema:
+                prop_type = "enum"
+
             required = prop_name in required_fields
 
             prop = SchemaProperty(
@@ -143,7 +145,7 @@ class SchemaModeller:
 
     # Nested array of objects → new table + 1:N relationship
     def _handle_array_property(
-        self, table_name: str, prop_name: str, prop_schema: Dict[str, Any]
+        self, table_name: str, prop_name: str, prop_schema: dict[str, Any]
     ) -> None:
         items = prop_schema.get("items") or {}
 
@@ -161,12 +163,11 @@ class SchemaModeller:
                     from_table=table_name,
                     to_table=nested_table_name,
                     foreign_key=prop_name,
-                    relationship_type="1:N",
                 )
             )
 
     def _handle_object_property(
-        self, table_name: str, prop_name: str, prop_schema: Dict[str, Any]
+        self, table_name: str, prop_name: str, prop_schema: dict[str, Any]
     ) -> None:
         nested_table_name = prop_schema.get("title", f"property['{prop_name}']")
 
@@ -177,11 +178,10 @@ class SchemaModeller:
                 from_table=table_name,
                 to_table=nested_table_name,
                 foreign_key=prop_name,
-                relationship_type="1:N",
             )
         )
 
-    def _resolve_ref(self, ref: str) -> Dict[str, Any]:
+    def _resolve_ref(self, ref: str) -> dict[str, Any]:
         if not self._enable_ref:
             raise NotImplementedError("Ref resolution disabled (enable_ref=False)")
 
